@@ -108,6 +108,16 @@ async function initIFC() {
   await loader.ifcManager.setWasmPath(import.meta.env.BASE_URL);
   loader.ifcManager.ifcAPI.isWasmPathAbsolute = true;
 
+  // Reduce circle segment counts → much faster geometry computation for curved elements
+  await loader.ifcManager.applyWebIfcConfig({
+    COORDINATE_TO_ORIGIN: true,
+    USE_FAST_BOOLS: true,
+    CIRCLE_SEGMENTS_LOW: 4,
+    CIRCLE_SEGMENTS_MEDIUM: 6,
+    CIRCLE_SEGMENTS_HIGH: 12,
+    BOOL_ABORT_THRESHOLD: 10000,
+  });
+
   // Enable BVH for fast raycast picking
   await loader.ifcManager.setupThreeMeshBVH(
     computeBoundsTree,
@@ -175,6 +185,7 @@ async function loadFile(file) {
     document.getElementById('vbadge').textContent = getVersion();
     document.getElementById('vbadge').style.display = '';
     document.getElementById('btn-dl').disabled = false;
+    document.getElementById('tcnt').textContent = stats.entities;
     document.getElementById('si-e').style.display = 'flex';
     document.getElementById('si-ev').textContent = stats.entities;
     document.getElementById('si-o').style.display = 'flex';
@@ -399,9 +410,6 @@ async function buildTreeNode(expressID, depth, ifcapi) {
   const ic = SP_ICON[type] || null;
   const isEl = !SP_ICON[type];
 
-  // Get spatial children (IfcRelAggregates + IfcRelContainedInSpatialStructure)
-  const spatialChildren = await loader.ifcManager.getSpatialStructure(ifcModelID, true);
-  // For recursive tree, use getSpatialStructure for IfcProject root only, else manual
   const children = await getChildren(expressID, ifcapi);
 
   const outer = document.createElement('div');
@@ -502,7 +510,9 @@ async function buildTypesView() {
   // Scan all lines for type names
   try {
     const allLines = ifcapi.GetAllLines(ifcModelID);
-    for (let i = 0; i < Math.min(allLines.size(), 50000); i++) {
+    const total = Math.min(allLines.size(), 50000);
+    for (let i = 0; i < total; i++) {
+      if (i % 500 === 0) await new Promise(r => setTimeout(r, 0)); // yield to UI thread
       const id = allLines.get(i);
       try {
         const props = ifcapi.GetLine(ifcModelID, id, false);

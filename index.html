@@ -47,7 +47,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);height:100vh;o
 .ph-b{font-family:var(--mono);font-size:10px;background:var(--bg4);color:var(--tx3);padding:1px 5px;border-radius:3px}
 
 /* Tree tabs */
-#ltabs{display:flex;border-bottom:1px solid var(--bdr);flex-shrink:0}
+#ltabs{display:flex;border-bottom:1px solid var(--bdr);flex-shrink:0;background:var(--bg3)}
 .ltab{flex:1;height:28px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .13s}
 .ltab:hover{color:var(--tx2)}.ltab.on{color:var(--ac);border-bottom-color:var(--ac)}
 
@@ -164,6 +164,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);height:100vh;o
 
 <div id="main">
   <div id="left">
+    <div class="ph"><span class="ph-t">Modellstruktur</span><span class="ph-b" id="tcnt">—</span></div>
     <div id="ltabs">
       <div class="ltab on" data-tab="tree">Struktur</div>
       <div class="ltab" data-tab="types">Typen</div>
