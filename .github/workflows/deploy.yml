@@ -37,12 +37,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Copy WASM files to dist root
-        run: |
-          cp node_modules/web-ifc/web-ifc.wasm dist/
-          cp node_modules/web-ifc/web-ifc-mt.wasm dist/ 2>/dev/null || true
-          cp node_modules/web-ifc/web-ifc-mt.worker.js dist/ 2>/dev/null || true
-
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

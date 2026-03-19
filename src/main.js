@@ -102,8 +102,11 @@ async function initIFC() {
 
   loader = new IFCLoader();
 
-  // Point to the WASM files that Vite copies into the build output
-  await loader.ifcManager.setWasmPath('/ifc-studio/');
+  // Point to the WASM files served from public/ (Vite serves them at BASE_URL)
+  // We set isWasmPathAbsolute = true directly because web-ifc-three doesn't expose
+  // that flag — without it the script-directory prefix gets prepended (→ 404).
+  await loader.ifcManager.setWasmPath(import.meta.env.BASE_URL);
+  loader.ifcManager.ifcAPI.isWasmPathAbsolute = true;
 
   // Enable BVH for fast raycast picking
   await loader.ifcManager.setupThreeMeshBVH(
