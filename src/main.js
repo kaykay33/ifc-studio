@@ -103,11 +103,15 @@ async function initIFC() {
 
   loader = new IFCLoader();
 
-  // Point to the WASM files served from public/ (Vite serves them at BASE_URL)
-  // We set isWasmPathAbsolute = true directly because web-ifc-three doesn't expose
-  // that flag — without it the script-directory prefix gets prepended (→ 404).
-  await loader.ifcManager.setWasmPath(import.meta.env.BASE_URL);
-  loader.ifcManager.ifcAPI.isWasmPathAbsolute = true;
+  // Pre-initialise the WASM with an explicit locateFile handler.
+  // This avoids the isWasmPathAbsolute flag entirely: the built JS lives at
+  // /ifc-studio/assets/, so without a custom handler the script-directory prefix
+  // gets prepended and the WASM URL becomes wrong (→ 404 returns HTML → magic
+  // word error).  BASE_URL is '/ifc-studio/' in prod and '/' in dev.
+  const wasmBase = import.meta.env.BASE_URL;
+  await loader.ifcManager.ifcAPI.Init(
+    path => path.endsWith('.wasm') ? wasmBase + path : path
+  );
 
   // Reduce circle segment counts → much faster geometry computation for curved elements
   await loader.ifcManager.applyWebIfcConfig({
