@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import * as THREE from 'three';
+import * as WebIFC from 'web-ifc';
 import { IFCLoader } from 'web-ifc-three/IFCLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
