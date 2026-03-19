@@ -21,6 +21,7 @@ let ifcModel = null;
 let ifcModelID = null;
 let rawBuf = null;
 let selectedExpressID = null;
+let selectedExpressIDs = new Set();
 let hiddenIDs = new Set();
 let curProps = [];
 let editOn = false;
@@ -141,6 +142,7 @@ async function loadFile(file) {
     ifcModel = null;
     ifcModelID = null;
     selectedExpressID = null;
+    selectedExpressIDs.clear();
     hiddenIDs.clear();
   }
 
@@ -290,44 +292,64 @@ async function onPick(e) {
   const expressID = await loader.ifcManager.getExpressId(hit.object.geometry, hit.faceIndex);
   if (expressID === undefined) { deselect(); return; }
 
-  await selectEntity(expressID);
+  await selectEntity(expressID, false, e.ctrlKey);
 }
 
-async function selectEntity(expressID, fromTree = false) {
-  deselect(false);
-  selectedExpressID = expressID;
+async function selectEntity(expressID, fromTree = false, ctrlKey = false) {
+  if (ctrlKey) {
+    if (selectedExpressIDs.has(expressID)) {
+      selectedExpressIDs.delete(expressID);
+      if (selectedExpressIDs.size === 0) { deselect(); return; }
+      selectedExpressID = [...selectedExpressIDs].at(-1);
+    } else {
+      selectedExpressIDs.add(expressID);
+      selectedExpressID = expressID;
+    }
+  } else {
+    selectedExpressIDs.clear();
+    selectedExpressIDs.add(expressID);
+    selectedExpressID = expressID;
+  }
 
-  // Highlight using subset
+  // Highlight all selected elements
+  try { loader.ifcManager.removeSubset(ifcModelID, undefined, 'selection'); } catch { /* ignore */ }
   loader.ifcManager.createSubset({
     modelID: ifcModelID,
-    ids: [expressID],
+    ids: [...selectedExpressIDs],
     material: new THREE.MeshLambertMaterial({ color: 0x4f9eff, transparent: true, opacity: 0.85, depthTest: true }),
     scene,
     removePrevious: true,
     customID: 'selection',
   });
 
-  // Get type name
-  const props = await loader.ifcManager.getItemProperties(ifcModelID, expressID);
+  // Get type name of primary selection
+  const props = await loader.ifcManager.getItemProperties(ifcModelID, selectedExpressID);
   const typeName = props?.type || 'Entity';
   const name = props?.Name?.value || props?.LongName?.value || '';
 
+  const count = selectedExpressIDs.size;
   const pill = document.getElementById('selpill');
-  pill.textContent = '#' + expressID + ' · ' + typeName.replace('IFC', '') + (name ? ' · ' + name : '');
+  if (count > 1) {
+    pill.textContent = count + ' Bauteile ausgewählt · Strg+Klick zum Hinzufügen';
+  } else {
+    pill.textContent = '#' + selectedExpressID + ' · ' + typeName.replace('IFC', '') + (name ? ' · ' + name : '');
+  }
   pill.classList.add('show');
   document.getElementById('si-s').style.display = 'flex';
-  document.getElementById('si-sv').textContent = typeName.replace('IFC', '');
+  document.getElementById('si-sv').textContent = count > 1 ? count + ' ×' : typeName.replace('IFC', '');
 
-  if (!fromTree) syncTreeSelection(expressID);
-
-  await showProperties(expressID);
+  if (!fromTree) syncTreeSelection(selectedExpressID);
+  updateAddAttrBar();
+  await showProperties(selectedExpressID);
 }
 
 function deselect(clearPanel = true) {
   selectedExpressID = null;
+  selectedExpressIDs.clear();
   try { loader.ifcManager.removeSubset(ifcModelID, undefined, 'selection'); } catch { /* ignore */ }
   document.getElementById('selpill').classList.remove('show');
   document.querySelectorAll('.tr.sel').forEach(r => r.classList.remove('sel'));
+  updateAddAttrBar();
   if (clearPanel) {
     document.getElementById('pw').innerHTML = '<div class="pempty"><div class="pempty-icon">◫</div><div>Element auswählen</div></div>';
     document.getElementById('pcnt').textContent = '—';
@@ -460,12 +482,12 @@ async function buildTreeNode(expressID, depth, ifcapi) {
     tc.classList.toggle('open');
   });
 
-  row.addEventListener('click', async () => {
+  row.addEventListener('click', async (e) => {
     if (hasKids && SP_ICON[type]) {
       ch.classList.toggle('open');
       tc.classList.toggle('open');
     }
-    await selectEntity(expressID, true);
+    await selectEntity(expressID, true, e.ctrlKey);
   });
 
   return outer;
@@ -548,7 +570,7 @@ async function buildTypesView() {
       const i2 = document.createElement('span'); i2.className = 'ti ic-E'; i2.textContent = '▪';
       const l2 = document.createElement('span'); l2.className = 'tl'; l2.textContent = '#' + id;
       itemRow.appendChild(t2); itemRow.appendChild(i2); itemRow.appendChild(l2);
-      itemRow.addEventListener('click', async () => { await selectEntity(id, true); });
+      itemRow.addEventListener('click', async (e) => { await selectEntity(id, true, e.ctrlKey); });
       ch.appendChild(itemRow);
     }
 
@@ -602,9 +624,9 @@ function renderSpatialGroup(node, parent, depth) {
   outer.appendChild(ch);
 
   tc.addEventListener('click', ev => { ev.stopPropagation(); ch.classList.toggle('open'); tc.classList.toggle('open'); });
-  row.addEventListener('click', async () => {
+  row.addEventListener('click', async (e) => {
     if (hasKids) { ch.classList.toggle('open'); tc.classList.toggle('open'); }
-    if (expressID !== undefined) await selectEntity(expressID, true);
+    if (expressID !== undefined) await selectEntity(expressID, true, e.ctrlKey);
   });
 
   parent.appendChild(outer);
@@ -619,9 +641,13 @@ function renderSpatialGroup(node, parent, depth) {
 // ── TREE SYNC ─────────────────────────────────────────────────
 function syncTreeSelection(expressID) {
   document.querySelectorAll('.tr.sel').forEach(r => r.classList.remove('sel'));
+  // Highlight all selected IDs in the tree
+  selectedExpressIDs.forEach(id => {
+    document.querySelectorAll('.tr[data-id="' + id + '"]').forEach(r => r.classList.add('sel'));
+  });
+  // Scroll to and expand the primary selection
   const rows = document.querySelectorAll('.tr[data-id="' + expressID + '"]');
   rows.forEach(row => {
-    row.classList.add('sel');
     row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     let p = row.parentElement;
     while (p) {
@@ -769,6 +795,63 @@ function mkPR(item, fa, fv) {
   return row;
 }
 
+// ── GUID & ATTRIBUTE WRITING ──────────────────────────────────
+function generateIfcGuid() {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
+  return Array.from({ length: 22 }, () => chars[Math.floor(Math.random() * 64)]).join('');
+}
+
+function updateAddAttrBar() {
+  const bar = document.getElementById('addattr-bar');
+  if (!bar) return;
+  const active = selectedExpressID !== null;
+  bar.style.display = active ? 'flex' : 'none';
+  const lbl = document.getElementById('addattr-lbl');
+  if (lbl) {
+    lbl.textContent = selectedExpressIDs.size > 1
+      ? '+ Attribut für ' + selectedExpressIDs.size + ' Elemente'
+      : '+ Attribut hinzufügen';
+  }
+}
+
+async function addAttribute(psetName, propName, propValue) {
+  const targetIDs = [...selectedExpressIDs];
+  if (!targetIDs.length || !rawBuf) { toast('Kein Element ausgewählt', 'err'); return; }
+  if (!psetName.trim() || !propName.trim()) { toast('Property Set und Name erforderlich', 'err'); return; }
+
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(rawBuf);
+
+  // Find max express ID
+  let maxID = 0;
+  const idPat = /#(\d+)=/g;
+  let m;
+  while ((m = idPat.exec(text)) !== null) {
+    const n = parseInt(m[1], 10);
+    if (n > maxID) maxID = n;
+  }
+
+  const propID = maxID + 1;
+  const psetID = maxID + 2;
+  const relID  = maxID + 3;
+  const idsStr = targetIDs.map(id => '#' + id).join(',');
+
+  const newLines =
+    `#${propID}=IFCPROPERTYSINGLEVALUE('${propName.trim()}',$,IFCLABEL('${propValue.trim()}'),$);\n` +
+    `#${psetID}=IFCPROPERTYSET('${generateIfcGuid()}',$,'${psetName.trim()}',$,(#${propID}));\n` +
+    `#${relID}=IFCRELDEFINESBYPROPERTIES('${generateIfcGuid()}',$,$,$,(${idsStr}),#${psetID});\n`;
+
+  rawBuf = new TextEncoder().encode(text.replace('END-ISO-10303-21;', newLines + 'END-ISO-10303-21;')).buffer;
+
+  // Reflect immediately in the properties panel
+  curProps.push({ title: psetName.trim(), items: [{ key: propName.trim(), val: propValue.trim(), raw: propValue.trim() }] });
+  renderProps();
+
+  chgN++;
+  document.getElementById('unsaved').classList.add('show');
+  toast('Attribut \'' + propName.trim() + '\' hinzugefügt ✓', 'ok');
+  document.getElementById('addattr-form').style.display = 'none';
+}
+
 // ── EDGES TOGGLE ──────────────────────────────────────────────
 let edgesOn = true;
 function toggleEdges() {
@@ -904,6 +987,30 @@ function initUI() {
     editOn = e.target.checked;
     document.getElementById('est').textContent = editOn ? 'aktiv' : 'aus';
     document.getElementById('est').style.color = editOn ? 'var(--am)' : 'var(--tx3)';
+  });
+
+  // Add attribute form
+  document.getElementById('btn-addattr').addEventListener('click', () => {
+    const form = document.getElementById('addattr-form');
+    const visible = form.style.display !== 'none';
+    form.style.display = visible ? 'none' : 'block';
+    if (!visible) document.getElementById('aa-pset').focus();
+  });
+  document.getElementById('aa-cancel').addEventListener('click', () => {
+    document.getElementById('addattr-form').style.display = 'none';
+  });
+  document.getElementById('aa-ok').addEventListener('click', async () => {
+    const pset = document.getElementById('aa-pset').value;
+    const name = document.getElementById('aa-name').value;
+    const val  = document.getElementById('aa-val').value;
+    await addAttribute(pset, name, val);
+    document.getElementById('aa-pset').value = '';
+    document.getElementById('aa-name').value = '';
+    document.getElementById('aa-val').value  = '';
+  });
+  // Submit form with Enter on last field
+  document.getElementById('aa-val').addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') document.getElementById('aa-ok').click();
   });
 
   // Keyboard shortcut

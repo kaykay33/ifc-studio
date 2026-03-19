@@ -149,6 +149,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);height:100vh;o
 #toast.ok{border-color:var(--gn);color:var(--gn)}.toast.err{border-color:var(--rd);color:var(--rd)}
 
 ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px}
+
+/* Add Attribute */
+#addattr-bar{display:none;padding:6px 11px;border-top:1px solid var(--bdr);flex-shrink:0;align-items:center}
+#addattr-form{padding:8px 11px;border-top:1px solid var(--bdr);flex-shrink:0;background:var(--bg3);display:none}
+.aarow{display:flex;gap:5px;margin-bottom:5px}.aarow:last-child{margin-bottom:0}
+.aarow .fi2{font-size:10px;padding:3px 7px}
 </style>
 </head>
 <body>
@@ -222,6 +228,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);height:100vh;o
       <div id="fcnt"></div>
     </div>
     <div id="pw"><div class="pempty"><div class="pempty-icon">◫</div><div>Element auswählen</div></div></div>
+    <div id="addattr-bar">
+      <button class="btn" id="btn-addattr" style="width:100%;justify-content:center"><span id="addattr-lbl">+ Attribut hinzufügen</span></button>
+    </div>
+    <div id="addattr-form">
+      <div class="aarow"><input class="fi2" id="aa-pset" placeholder="Property Set Name…"></div>
+      <div class="aarow"><input class="fi2" id="aa-name" placeholder="Attribut Name…"></div>
+      <div class="aarow"><input class="fi2" id="aa-val" placeholder="Wert…"></div>
+      <div class="aarow"><button class="btn p" id="aa-ok" style="flex:1">Hinzufügen</button><button class="btn" id="aa-cancel">Abbrechen</button></div>
+    </div>
     <div id="unsaved"><span>⚠ Ungespeicherte Änderungen</span><button class="btn" style="height:22px;font-size:10px" id="btn-revert">Zurücksetzen</button></div>
   </div>
 </div>
